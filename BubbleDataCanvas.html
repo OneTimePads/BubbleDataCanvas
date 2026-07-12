@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bubble Data Canvas</title>
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='central' font-size='48' fill='cyan'%3E%E2%97%AF%3C/text%3E%3C/svg%3E">
     <style>
         body {
             margin: 0;
@@ -23,6 +24,7 @@
         }
         button {
             padding: 8px 16px;
+            margin-bottom: 8px;
             margin-right: 8px;
             cursor: pointer;
             border: 1px solid #45a29e;
@@ -38,32 +40,29 @@
             color: #0b0c10;
             box-shadow: 0 0 10px rgba(102, 252, 241, 0.5);
         }
-		#instructions {
-			margin-top: 4px;
-			background: rgba(31, 40, 51, 0.4); /* Reduced opacity */
-			padding: 8px;
-			border-radius: 6px;
-			font-size: 8px; /* Made very small */
-			color: #c5c6c7;
-			box-shadow: none;
-			pointer-events: none; /* Keeps it from blocking mouse clicks */
-			border: none;
-			line-height: 1.4;
-			user-select: none;
-		}
-		#instructions {
-			margin-top: 12px;
-			background: rgba(31, 40, 51, 0.4); /* Reduced opacity */
-			padding: 8px;
-			border-radius: 6px;
-			font-size: 10px; /* Made very small */
-			color: #c5c6c7;
-			box-shadow: none;
-			pointer-events: none; /* Keeps it from blocking mouse clicks */
-			border: none;
-			line-height: 1.4;
-			user-select: none;
-		}
+        /* New styling for the red Erase Local button */
+        #eraseLocalBtn {
+            border-color: #ff4c4c;
+            color: #ff4c4c;
+        }
+        #eraseLocalBtn:hover {
+            background: #ff4c4c;
+            color: #0b0c10;
+            box-shadow: 0 0 10px rgba(255, 76, 76, 0.5);
+        }
+        #instructions {
+            margin-top: 4px;
+            background: rgba(31, 40, 51, 0.4);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            color: #c5c6c7;
+            box-shadow: none;
+            pointer-events: none;
+            border: none;
+            line-height: 1.4;
+            user-select: none;
+        }
         #instructions b {
             color: #66fcf1;
         }
@@ -71,10 +70,18 @@
 </head>
 <body>
 
-    <div id="ui">
-        <button id="saveBtn">Save Data</button>
-        <button id="loadBtn">Load Data</button>
-        <input type="file" id="fileInput" style="display: none;" accept=".json">
+		<div id="ui">
+			<div class="buttonRow">
+			<button id="exportBtn">Export Data</button>
+			<button id="importBtn">Import Data</button>
+			<button id="eraseLocalBtn">Erase Local</button>
+		</div>
+
+		<div class="buttonRow">
+			<button id="saveLocalBtn">💾 Save Local</button>
+		</div>
+
+		<input type="file" id="fileInput" style="display: none;" accept=".json">
         
         <div id="instructions">
             <b>Scroll</b>: Fast Zoom In/Out<br>
@@ -84,7 +91,8 @@
             <b>Double-Click</b>: Add Nested Bubble (sized to current zoom)<br>
             <b>Shift + Double-Click</b>: Add a Smaller Nested Bubble<br>
             <b>Right-Click</b>: Edit Bubble Text (clear it to delete)<br>
-            <b>Save/Load</b>: Optional password encrypts the file via custom XOR-CBC
+            <b>Export/Import</b>: Optional password encrypts the file via custom XOR-CBC<br>
+            <b>Save Local</b>: Stores data in browser (also supports password encryption)
         </div>
     </div>
 
@@ -112,10 +120,27 @@
         let camera = { x: 0, y: 0, zoom: 1 };
         const MIN_ZOOM = 0.5;
         const MAX_ZOOM = 5000000000000000; 
+        
         let needsRedraw = true;
+        let hasUnsavedChanges = false; // Tracks if the user has made changes since last save
 
         let viewW = window.innerWidth;
         let viewH = window.innerHeight;
+
+        function markChanged() {
+            needsRedraw = true;
+            hasUnsavedChanges = true;
+        }
+
+        // -----------------------------------------------------------
+        // Browser Window Close Warning
+        // -----------------------------------------------------------
+        window.addEventListener('beforeunload', (e) => {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = ''; // Standard implementation for the browser's native warning prompt
+            }
+        });
 
         function resize() {
             const dpr = window.devicePixelRatio || 1;
@@ -126,7 +151,7 @@
             canvas.style.width = viewW + 'px';
             canvas.style.height = viewH + 'px';
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            needsRedraw = true;
+            needsRedraw = true; 
         }
         window.addEventListener('resize', resize);
         resize();
@@ -153,118 +178,118 @@
             drawBubble(rootBubble, 1.0);
         }
 
-		const textCache = new Map();
+        const textCache = new Map();
 
-		function getWrappedTextLines(text) {
-			if (textCache.has(text)) return textCache.get(text);
+        function getWrappedTextLines(text) {
+            if (textCache.has(text)) return textCache.get(text);
 
-			let tempCanvas = document.createElement('canvas');
-			let ctxTemp = tempCanvas.getContext('2d');
-			let baseFontSize = 22; 
-			ctxTemp.font = `bold ${baseFontSize}px sans-serif`;
+            let tempCanvas = document.createElement('canvas');
+            let ctxTemp = tempCanvas.getContext('2d');
+            let baseFontSize = 22; 
+            ctxTemp.font = `bold ${baseFontSize}px sans-serif`;
 
-			let words = text.split(' ');
-			let lines = [];
-			let currentLine = words[0] || "";
-			let maxWidth = 140; 
+            let words = text.split(' ');
+            let lines = [];
+            let currentLine = words[0] || "";
+            let maxWidth = 140; 
 
-			for (let i = 1; i < words.length; i++) {
-				let word = words[i];
-				let testLine = currentLine + " " + word;
-				let metrics = ctxTemp.measureText(testLine);
-				if (metrics.width < maxWidth) {
-					currentLine = testLine;
-				} else {
-					lines.push(currentLine);
-					currentLine = word;
-				}
-			}
-			lines.push(currentLine);
-			textCache.set(text, lines);
-			return lines;
-		}
+            for (let i = 1; i < words.length; i++) {
+                let word = words[i];
+                let testLine = currentLine + " " + word;
+                let metrics = ctxTemp.measureText(testLine);
+                if (metrics.width < maxWidth) {
+                    currentLine = testLine;
+                } else {
+                    lines.push(currentLine);
+                    currentLine = word;
+                }
+            }
+            lines.push(currentLine);
+            textCache.set(text, lines);
+            return lines;
+        }
 
-		function drawWrappedText(text, screenX, screenY, screenR, alpha) {
-			if (screenR < 6) return; 
+        function drawWrappedText(text, screenX, screenY, screenR, alpha) {
+            if (screenR < 6) return; 
 
-			let lines = getWrappedTextLines(text);
+            let lines = getWrappedTextLines(text);
 
-			ctx.fillStyle = `rgba(245, 245, 250, ${alpha})`;
-			ctx.textAlign = 'center';
-			ctx.textBaseline = 'middle';
+            ctx.fillStyle = `rgba(245, 245, 250, ${alpha})`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
 
-			let scale = screenR / 100;
-			let baseFontSize = 22 * scale;
-			ctx.font = `bold ${baseFontSize}px sans-serif`;
+            let scale = screenR / 100;
+            let baseFontSize = 22 * scale;
+            ctx.font = `bold ${baseFontSize}px sans-serif`;
 
-			let lineHeight = baseFontSize * 1.2;
-			let totalHeight = lines.length * lineHeight;
-			
-			if (totalHeight > screenR * 1.4) {
-				let scaleFactor = (screenR * 1.4) / totalHeight;
-				baseFontSize *= scaleFactor;
-				if (baseFontSize < 1) return;
-				ctx.font = `bold ${baseFontSize}px sans-serif`;
-				lineHeight = baseFontSize * 1.2;
-				totalHeight = lines.length * lineHeight;
-			}
+            let lineHeight = baseFontSize * 1.2;
+            let totalHeight = lines.length * lineHeight;
+            
+            if (totalHeight > screenR * 1.4) {
+                let scaleFactor = (screenR * 1.4) / totalHeight;
+                baseFontSize *= scaleFactor;
+                if (baseFontSize < 1) return;
+                ctx.font = `bold ${baseFontSize}px sans-serif`;
+                lineHeight = baseFontSize * 1.2;
+                totalHeight = lines.length * lineHeight;
+            }
 
-			let startY = screenY - (totalHeight / 2) + (lineHeight / 2);
-			for (let j = 0; j < lines.length; j++) {
-				ctx.fillText(lines[j], screenX, startY + (j * lineHeight));
-			}
-		}
+            let startY = screenY - (totalHeight / 2) + (lineHeight / 2);
+            for (let j = 0; j < lines.length; j++) {
+                ctx.fillText(lines[j], screenX, startY + (j * lineHeight));
+            }
+        }
 
-		function drawBubble(b, alphaMultiplier) {
-			let screenX = (b.x - camera.x) * camera.zoom + viewW / 2;
-			let screenY = (b.y - camera.y) * camera.zoom + viewH / 2;
-			let screenR = b.r * camera.zoom;
+        function drawBubble(b, alphaMultiplier) {
+            let screenX = (b.x - camera.x) * camera.zoom + viewW / 2;
+            let screenY = (b.y - camera.y) * camera.zoom + viewH / 2;
+            let screenR = b.r * camera.zoom;
 
-			if (screenR * alphaMultiplier < 0.5) return; 
-			if (screenX + screenR < 0 || screenX - screenR > viewW ||
-				screenY + screenR < 0 || screenY - screenR > viewH) return;
+            if (screenR * alphaMultiplier < 0.5) return; 
+            if (screenX + screenR < 0 || screenX - screenR > viewW ||
+                screenY + screenR < 0 || screenY - screenR > viewH) return;
 
-			let sqR = screenR * screenR;
-			let distTopLeftSq = (screenX * screenX) + (screenY * screenY);
-			let distTopRightSq = ((screenX - viewW) ** 2) + (screenY * screenY);
-			let distBottomLeftSq = (screenX * screenX) + ((screenY - viewH) ** 2);
-			let distBottomRightSq = ((screenX - viewW) ** 2) + ((screenY - viewH) ** 2);
+            let sqR = screenR * screenR;
+            let distTopLeftSq = (screenX * screenX) + (screenY * screenY);
+            let distTopRightSq = ((screenX - viewW) ** 2) + (screenY * screenY);
+            let distBottomLeftSq = (screenX * screenX) + ((screenY - viewH) ** 2);
+            let distBottomRightSq = ((screenX - viewW) ** 2) + ((screenY - viewH) ** 2);
 
-			let maxCornerDistSq = Math.max(distTopLeftSq, distTopRightSq, distBottomLeftSq, distBottomRightSq);
+            let maxCornerDistSq = Math.max(distTopLeftSq, distTopRightSq, distBottomLeftSq, distBottomRightSq);
 
-			if (maxCornerDistSq < sqR) {
-				ctx.fillStyle = `rgba(26, 26, 36, ${alphaMultiplier * 0.75})`;
-				ctx.fillRect(0, 0, viewW, viewH);
-			} else {
-				ctx.beginPath();
-				ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
-				ctx.fillStyle = `rgba(26, 26, 36, ${alphaMultiplier * 0.75})`;
-				ctx.fill();
-				ctx.strokeStyle = `rgba(102, 252, 241, ${alphaMultiplier})`;
-				ctx.lineWidth = Math.max(1, Math.min(screenR * 0.01, 4));
-				ctx.stroke();
-			}
+            if (maxCornerDistSq < sqR) {
+                ctx.fillStyle = `rgba(26, 26, 36, ${alphaMultiplier * 0.75})`;
+                ctx.fillRect(0, 0, viewW, viewH);
+            } else {
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(26, 26, 36, ${alphaMultiplier * 0.75})`;
+                ctx.fill();
+                ctx.strokeStyle = `rgba(102, 252, 241, ${alphaMultiplier})`;
+                ctx.lineWidth = Math.max(1, Math.min(screenR * 0.01, 4));
+                ctx.stroke();
+            }
 
-			if (screenR > 25 && alphaMultiplier > 0.15) {
-				drawGizmo(screenX, screenY, alphaMultiplier);
-			}
-			
-			let textFade = Math.max(0, Math.min(1, 1 - (screenR - 250) / 250));
-			let finalTextAlpha = alphaMultiplier * textFade;
+            if (screenR > 25 && alphaMultiplier > 0.15) {
+                drawGizmo(screenX, screenY, alphaMultiplier);
+            }
+            
+            let textFade = Math.max(0, Math.min(1, 1 - (screenR - 250) / 250));
+            let finalTextAlpha = alphaMultiplier * textFade;
 
-			if (finalTextAlpha > 0.01) {
-				drawWrappedText(b.text, screenX, screenY, screenR, finalTextAlpha);
-			}
+            if (finalTextAlpha > 0.01) {
+                drawWrappedText(b.text, screenX, screenY, screenR, finalTextAlpha);
+            }
 
-			let childrenFade = Math.max(0, Math.min(1, (screenR - 100) / 150));
-			let nextAlphaMultiplier = alphaMultiplier * childrenFade;
+            let childrenFade = Math.max(0, Math.min(1, (screenR - 100) / 150));
+            let nextAlphaMultiplier = alphaMultiplier * childrenFade;
 
-			if (nextAlphaMultiplier > 0.01) {
-				for (let child of b.children) {
-					drawBubble(child, nextAlphaMultiplier);
-				}
-			}
-		}
+            if (nextAlphaMultiplier > 0.01) {
+                for (let child of b.children) {
+                    drawBubble(child, nextAlphaMultiplier);
+                }
+            }
+        }
 
         function drawGizmo(sx, sy, alpha) {
             ctx.save();
@@ -381,25 +406,22 @@
             }
         }
 
-		function scaleBubbleHierarchy(b, scale, originX = b.x, originY = b.y) {
-			b.r *= scale;
-			for (let child of b.children) {
-				// Calculate the child's distance from the TOP-LEVEL origin, not the immediate parent
-				let dx = child.x - originX;
-				let dy = child.y - originY;
-				
-				// Move the child outward from that central origin
-				child.x = originX + dx * scale;
-				child.y = originY + dy * scale;
-				
-				// Pass the SAME origin down to the grandchildren, great-grandchildren, etc.
-				scaleBubbleHierarchy(child, scale, originX, originY);
-			}
-		}
+        function scaleBubbleHierarchy(b, scale, originX = b.x, originY = b.y) {
+            b.r *= scale;
+            for (let child of b.children) {
+                let dx = child.x - originX;
+                let dy = child.y - originY;
+                
+                child.x = originX + dx * scale;
+                child.y = originY + dy * scale;
+                
+                scaleBubbleHierarchy(child, scale, originX, originY);
+            }
+        }
 
         function fitToParent(bubble, parentObj) {
             if (parentObj.id === rootBubble.id) return;
-            let maxAllowed = parentObj.r * 0.7; // Fit comfortably within 70% of parent's radius
+            let maxAllowed = parentObj.r * 0.7; 
             if (bubble.r > maxAllowed) {
                 let scale = maxAllowed / bubble.r;
                 scaleBubbleHierarchy(bubble, scale);
@@ -428,83 +450,75 @@
         window.addEventListener("mouseleave", cancelInteraction);
         window.addEventListener("blur", cancelInteraction);
 
-		canvas.addEventListener('mousedown', e => {
-			let wCoords = getRawWorldCoords(e.clientX, e.clientY);
-			lastMouseX = e.clientX;
-			lastMouseY = e.clientY;
+        canvas.addEventListener('mousedown', e => {
+            let wCoords = getRawWorldCoords(e.clientX, e.clientY);
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
 
-			// 1. Prioritize GIZMO check (fixes the child-over-parent bug)
-			// We check ALL bubbles recursively for gizmos first, regardless of hierarchy
-			let allBubbles = [];
-			function collect(b) { allBubbles.push(b); b.children.forEach(collect); }
-			collect(rootBubble);
-			
-			// Sort by screen size (smallest first) so we hit the "top" bubble
-			allBubbles.sort((a,b) => (a.r * camera.zoom) - (b.r * camera.zoom));
+            let allBubbles = [];
+            function collect(b) { allBubbles.push(b); b.children.forEach(collect); }
+            collect(rootBubble);
+            
+            allBubbles.sort((a,b) => (a.r * camera.zoom) - (b.r * camera.zoom));
 
-			for(let b of allBubbles) {
-				let screenX = (b.x - camera.x) * camera.zoom + viewW / 2;
-				let screenY = (b.y - camera.y) * camera.zoom + viewH / 2;
-				let screenDistToCenter = Math.hypot(e.clientX - screenX, e.clientY - screenY);
-				
-				if (screenDistToCenter <= GIZMO_RADIUS) {
-					activeBubble = b;
-					interactionMode = 'move';
-					dragOffsetWorldX = wCoords.x - b.x;
-					dragOffsetWorldY = wCoords.y - b.y;
-					return;
-				}
-			}
+            for(let b of allBubbles) {
+                let screenX = (b.x - camera.x) * camera.zoom + viewW / 2;
+                let screenY = (b.y - camera.y) * camera.zoom + viewH / 2;
+                let screenDistToCenter = Math.hypot(e.clientX - screenX, e.clientY - screenY);
+                
+                if (screenDistToCenter <= GIZMO_RADIUS) {
+                    activeBubble = b;
+                    interactionMode = 'move';
+                    dragOffsetWorldX = wCoords.x - b.x;
+                    dragOffsetWorldY = wCoords.y - b.y;
+                    return;
+                }
+            }
 
-			// 2. Handle Panning via MOUSE WHEEL (button 1)
-			if (e.button === 1) {
-				interactionMode = 'pan';
-				return;
-			}
+            if (e.button === 1) {
+                interactionMode = 'pan';
+                return;
+            }
 
-			// 3. Handle Resize/Pan LMB
-			if (e.button === 0) {
-				let borderTarget = findBorderTarget(rootBubble, e.clientX, e.clientY);
-				if (borderTarget) {
-					activeBubble = borderTarget;
-					interactionMode = 'resize';
-					resizeStartRadius = borderTarget.r;
-					resizeStartDistance = Math.hypot(wCoords.x - borderTarget.x, wCoords.y - borderTarget.y);
-					return;
-				}
-			}
-		});
+            if (e.button === 0) {
+                let borderTarget = findBorderTarget(rootBubble, e.clientX, e.clientY);
+                if (borderTarget) {
+                    activeBubble = borderTarget;
+                    interactionMode = 'resize';
+                    resizeStartRadius = borderTarget.r;
+                    resizeStartDistance = Math.hypot(wCoords.x - borderTarget.x, wCoords.y - borderTarget.y);
+                    return;
+                }
+            }
+        });
 
-		window.addEventListener('mousemove', e => {
-			if (interactionMode !== 'none') {
-			
-			if (interactionMode === 'pan') {
-					// Only pan if middle button is held
-					if (e.buttons & 4) { 
-						canvas.style.cursor = 'grabbing';
-						let dx = e.clientX - lastMouseX;
-						let dy = e.clientY - lastMouseY;
-						camera.x -= dx / camera.zoom;
-						camera.y -= dy / camera.zoom;
-						lastMouseX = e.clientX;
-						lastMouseY = e.clientY;
-						needsRedraw = true;
-					} else {
-						cancelInteraction();
-					}
-				} 
-				
-				else if (interactionMode === 'move' && activeBubble) {
-					let wCoords = getRawWorldCoords(e.clientX, e.clientY);
-					canvas.style.cursor = 'move';
-					let targetX = wCoords.x - dragOffsetWorldX;
-					let targetY = wCoords.y - dragOffsetWorldY;
+        window.addEventListener('mousemove', e => {
+            if (interactionMode !== 'none') {
+            
+            if (interactionMode === 'pan') {
+                    if (e.buttons & 4) { 
+                        canvas.style.cursor = 'grabbing';
+                        let dx = e.clientX - lastMouseX;
+                        let dy = e.clientY - lastMouseY;
+                        camera.x -= dx / camera.zoom;
+                        camera.y -= dy / camera.zoom;
+                        lastMouseX = e.clientX;
+                        lastMouseY = e.clientY;
+                        markChanged();
+                    } else {
+                        cancelInteraction();
+                    }
+                } 
+                
+                else if (interactionMode === 'move' && activeBubble) {
+                    let wCoords = getRawWorldCoords(e.clientX, e.clientY);
+                    canvas.style.cursor = 'move';
+                    let targetX = wCoords.x - dragOffsetWorldX;
+                    let targetY = wCoords.y - dragOffsetWorldY;
 
-					let parent = findParent(rootBubble, activeBubble.id);
-					if (parent) {
+                    let parent = findParent(rootBubble, activeBubble.id);
+                    if (parent) {
                         
-                        // --- DYNAMIC REPARENTING: POP OUT ---
-                        // Ascend tree if bubble is pulled beyond the parent's boundary
                         if (parent.id !== rootBubble.id) {
                             let distToParent = Math.hypot(targetX - parent.x, targetY - parent.y);
                             if (distToParent > parent.r) {
@@ -518,8 +532,6 @@
                             }
                         }
 
-                        // --- DYNAMIC REPARENTING: POP IN ---
-                        // Descend tree if bubble is pushed deep into a sibling's boundary
                         for (let sibling of [...parent.children]) {
                             if (sibling.id === activeBubble.id) continue;
                             let distToSibling = Math.hypot(targetX - sibling.x, targetY - sibling.y);
@@ -532,117 +544,111 @@
                             }
                         }
 
-						const RELAXATION_ITERATIONS = 6;
-						for (let iter = 0; iter < RELAXATION_ITERATIONS; iter++) {
-							let moved = false;
+                        const RELAXATION_ITERATIONS = 6;
+                        for (let iter = 0; iter < RELAXATION_ITERATIONS; iter++) {
+                            let moved = false;
 
-							for (let sibling of parent.children) {
-								if (sibling.id === activeBubble.id) continue;
-								let dist = Math.hypot(targetX - sibling.x, targetY - sibling.y);
-								let minDist = activeBubble.r + sibling.r;
+                            for (let sibling of parent.children) {
+                                if (sibling.id === activeBubble.id) continue;
+                                let dist = Math.hypot(targetX - sibling.x, targetY - sibling.y);
+                                let minDist = activeBubble.r + sibling.r;
 
-								if (dist < minDist) {
-									moved = true;
-									if (dist > 0.001) {
-										let overlap = minDist - dist;
-										targetX += (targetX - sibling.x) / dist * overlap;
-										targetY += (targetY - sibling.y) / dist * overlap;
-									} else {
-										targetX += minDist;
-									}
-								}
-							}
+                                if (dist < minDist) {
+                                    moved = true;
+                                    if (dist > 0.001) {
+                                        let overlap = minDist - dist;
+                                        targetX += (targetX - sibling.x) / dist * overlap;
+                                        targetY += (targetY - sibling.y) / dist * overlap;
+                                    } else {
+                                        targetX += minDist;
+                                    }
+                                }
+                            }
 
-							let distanceToParent = Math.hypot(targetX - parent.x, targetY - parent.y);
-							let maxAllowedDistance = parent.r - activeBubble.r;
-							
+                            let distanceToParent = Math.hypot(targetX - parent.x, targetY - parent.y);
+                            let maxAllowedDistance = parent.r - activeBubble.r;
+                            
                             if (distanceToParent > maxAllowedDistance) {
-								moved = true;
-								if (distanceToParent === 0) {
-									targetX = parent.x;
-									targetY = parent.y;
-								} else {
-									targetX = parent.x + (targetX - parent.x) * (maxAllowedDistance / distanceToParent);
-									targetY = parent.y + (targetY - parent.y) * (maxAllowedDistance / distanceToParent);
-								}
-							}
+                                moved = true;
+                                if (distanceToParent === 0) {
+                                    targetX = parent.x;
+                                    targetY = parent.y;
+                                } else {
+                                    targetX = parent.x + (targetX - parent.x) * (maxAllowedDistance / distanceToParent);
+                                    targetY = parent.y + (targetY - parent.y) * (maxAllowedDistance / distanceToParent);
+                                }
+                            }
 
-							if (!moved) break;
-						}
-					}
+                            if (!moved) break;
+                        }
+                    }
 
-					let deltaX = targetX - activeBubble.x;
-					let deltaY = targetY - activeBubble.y;
-					moveBubbleRecursively(activeBubble, deltaX, deltaY);
-					needsRedraw = true;
-				} 
-				
-				else if (interactionMode === 'resize' && activeBubble) {
-					let wCoords = getRawWorldCoords(e.clientX, e.clientY);
-					canvas.style.cursor = 'ew-resize';
-					
-					let currentDistance = Math.hypot(wCoords.x - activeBubble.x, wCoords.y - activeBubble.y);
-					let proposedRadius = resizeStartRadius + (currentDistance - resizeStartDistance);
+                    let deltaX = targetX - activeBubble.x;
+                    let deltaY = targetY - activeBubble.y;
+                    moveBubbleRecursively(activeBubble, deltaX, deltaY);
+                    markChanged();
+                } 
+                
+                else if (interactionMode === 'resize' && activeBubble) {
+                    let wCoords = getRawWorldCoords(e.clientX, e.clientY);
+                    canvas.style.cursor = 'ew-resize';
+                    
+                    let currentDistance = Math.hypot(wCoords.x - activeBubble.x, wCoords.y - activeBubble.y);
+                    let proposedRadius = resizeStartRadius + (currentDistance - resizeStartDistance);
 
-					let parent = findParent(rootBubble, activeBubble.id);
-					
-					if (parent) {
-						let distanceToParent = Math.hypot(activeBubble.x - parent.x, activeBubble.y - parent.y);
-						let maxRadiusAllowed = parent.r - distanceToParent;
-						if (proposedRadius > maxRadiusAllowed) proposedRadius = maxRadiusAllowed;
+                    let parent = findParent(rootBubble, activeBubble.id);
+                    
+                    if (parent) {
+                        let distanceToParent = Math.hypot(activeBubble.x - parent.x, activeBubble.y - parent.y);
+                        let maxRadiusAllowed = parent.r - distanceToParent;
+                        if (proposedRadius > maxRadiusAllowed) proposedRadius = maxRadiusAllowed;
 
-						for (let sibling of parent.children) {
-							if (sibling.id === activeBubble.id) continue;
-							let distToSibling = Math.hypot(activeBubble.x - sibling.x, activeBubble.y - sibling.y);
-							let maxRadiusDueToSibling = distToSibling - sibling.r;
-							if (proposedRadius > maxRadiusDueToSibling) {
-								proposedRadius = maxRadiusDueToSibling;
-							}
-						}
-					}
-					// --- NEW RECURSIVE SCALING LOGIC ---
+                        for (let sibling of parent.children) {
+                            if (sibling.id === activeBubble.id) continue;
+                            let distToSibling = Math.hypot(activeBubble.x - sibling.x, activeBubble.y - sibling.y);
+                            let maxRadiusDueToSibling = distToSibling - sibling.r;
+                            if (proposedRadius > maxRadiusDueToSibling) {
+                                proposedRadius = maxRadiusDueToSibling;
+                            }
+                        }
+                    }
 
-					// 1. Set an absolute minimum so the bubble doesn't invert or vanish
-					let absoluteMinRadius = MIN_SCREEN_RADIUS / camera.zoom;
-					if (proposedRadius < absoluteMinRadius) {
-						proposedRadius = absoluteMinRadius;
-					}
+                    let absoluteMinRadius = MIN_SCREEN_RADIUS / camera.zoom;
+                    if (proposedRadius < absoluteMinRadius) {
+                        proposedRadius = absoluteMinRadius;
+                    }
 
-					// 2. Calculate the relative scale factor for this specific frame
-					let scaleFactor = proposedRadius / activeBubble.r;
+                    let scaleFactor = proposedRadius / activeBubble.r;
+                    scaleBubbleHierarchy(activeBubble, scaleFactor);
 
-					// 3. Apply the scale factor recursively to the active bubble and all children
-					// (Your existing scaleBubbleHierarchy function handles the radius and XY offsets beautifully)
-					scaleBubbleHierarchy(activeBubble, scaleFactor);
+                    markChanged();
+                }
+                return; 
+            }
 
-					needsRedraw = true;
-				}
-				return; 
-			}
+            if (Math.abs(e.clientX - lastMouseX) < 3 && Math.abs(e.clientY - lastMouseY) < 3) return;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
 
-			if (Math.abs(e.clientX - lastMouseX) < 3 && Math.abs(e.clientY - lastMouseY) < 3) return;
-			lastMouseX = e.clientX;
-			lastMouseY = e.clientY;
+            let wCoords = getRawWorldCoords(e.clientX, e.clientY);
+            let deepTarget = findDeepestBubble(rootBubble, wCoords.x, wCoords.y);
+            let overGizmo = false;
 
-			let wCoords = getRawWorldCoords(e.clientX, e.clientY);
-			let deepTarget = findDeepestBubble(rootBubble, wCoords.x, wCoords.y);
-			let overGizmo = false;
+            if (deepTarget) {
+                let screenX = (deepTarget.x - camera.x) * camera.zoom + viewW / 2;
+                let screenY = (deepTarget.y - camera.y) * camera.zoom + viewH / 2;
+                let screenDistToCenter = Math.hypot(e.clientX - screenX, e.clientY - screenY);
+                if (screenDistToCenter <= GIZMO_RADIUS) overGizmo = true;
+            }
 
-			if (deepTarget) {
-				let screenX = (deepTarget.x - camera.x) * camera.zoom + viewW / 2;
-				let screenY = (deepTarget.y - camera.y) * camera.zoom + viewH / 2;
-				let screenDistToCenter = Math.hypot(e.clientX - screenX, e.clientY - screenY);
-				if (screenDistToCenter <= GIZMO_RADIUS) overGizmo = true;
-			}
-
-			if (overGizmo) {
-				canvas.style.cursor = 'move';
-			} else if (findBorderTarget(rootBubble, e.clientX, e.clientY)) {
-				canvas.style.cursor = 'ew-resize';
-			} else {
-				canvas.style.cursor = 'grab';
-			}
-		});
+            if (overGizmo) {
+                canvas.style.cursor = 'move';
+            } else if (findBorderTarget(rootBubble, e.clientX, e.clientY)) {
+                canvas.style.cursor = 'ew-resize';
+            } else {
+                canvas.style.cursor = 'grab';
+            }
+        });
 
         window.addEventListener('mouseup', () => {
             interactionMode = 'none';
@@ -657,13 +663,13 @@
             let mouseWorldX = (e.clientX - viewW / 2) / camera.zoom + camera.x;
             let mouseWorldY = (e.clientY - viewH / 2) / camera.zoom + camera.y;
 
-			let newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, camera.zoom * scale));
+            let newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, camera.zoom * scale));
 
             camera.zoom = newZoom;
             camera.x = mouseWorldX - (e.clientX - viewW / 2) / camera.zoom;
             camera.y = mouseWorldY - (e.clientY - viewH / 2) / camera.zoom;
 
-            needsRedraw = true;
+            markChanged();
         }, { passive: false });
 
         canvas.addEventListener('dblclick', e => {
@@ -726,7 +732,7 @@
                         r: newRadius,
                         children: []
                     });
-                    needsRedraw = true;
+                    markChanged();
                 }
             }
         });
@@ -754,14 +760,14 @@
                         activeBubble = null;
                         interactionMode = 'none';
                     }
-                    needsRedraw = true;
+                    markChanged();
                 } else {
                     let oldText = target.text;
                     target.text = newText.trim();
                     if (oldText !== target.text && !isTextStillUsed(rootBubble, oldText)) {
                         textCache.delete(oldText);
                     }
-                    needsRedraw = true;
+                    markChanged();
                 }
             }
         });
@@ -838,10 +844,11 @@
         }
 
         // -----------------------------------------------------------
-        // State Persistence Systems
+        // State Persistence Systems (Export/Import & Local Storage)
         // -----------------------------------------------------------
 
-        document.getElementById('saveBtn').addEventListener('click', () => {
+        // 1. Export Data to File
+        document.getElementById('exportBtn').addEventListener('click', () => {
             const dataObj = { rootBubble, camera };
             let outputObj = dataObj;
             let filename = "patched_bubble_canvas.json";
@@ -871,9 +878,12 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            
+            hasUnsavedChanges = false; // Reset the warning since data is safely exported
         });
 
-        document.getElementById('loadBtn').addEventListener('click', () => {
+        // 2. Import Data from File
+        document.getElementById('importBtn').addEventListener('click', () => {
             document.getElementById('fileInput').click();
         });
 
@@ -918,7 +928,7 @@
                     if (payload.rootBubble && payload.rootBubble.children !== undefined) {
                         rootBubble = payload.rootBubble;
                         if (payload.camera) camera = payload.camera;
-                        needsRedraw = true;
+                        markChanged(); // Mark as unsaved so the user remembers to save locally/export later
                     } else {
                         alert("Malformed template dataset structure.");
                     }
@@ -930,6 +940,92 @@
 
             e.target.value = "";
         });
+
+        // 3. Save to Local Storage
+        document.getElementById('saveLocalBtn').addEventListener('click', () => {
+            const dataObj = { rootBubble, camera };
+            let outputObj = dataObj;
+
+            let password = prompt(
+                "Optional: enter a password to encrypt local storage.\nLeave blank to save without encryption."
+            );
+
+            if (password) {
+                try {
+                    outputObj = encryptJSON(dataObj, password);
+                } catch (err) {
+                    alert("Encryption failed (" + err.message + "). Saving without encryption instead.");
+                    outputObj = dataObj;
+                }
+            }
+
+            try {
+                localStorage.setItem('bubbleCanvasLocalData', JSON.stringify(outputObj));
+                hasUnsavedChanges = false; // Reset warning since data is safely secured locally
+                alert("Canvas successfully saved to local browser storage.");
+            } catch (err) {
+                alert("Failed to save locally. Your storage might be full or blocked.");
+            }
+        });
+
+        // 4. Erase Local Storage
+        document.getElementById('eraseLocalBtn').addEventListener('click', () => {
+            if (confirm("Are you sure you want to erase the locally stored data? This cannot be undone.")) {
+                localStorage.removeItem('bubbleCanvasLocalData');
+                alert("Local data has been permanently erased.");
+            }
+        });
+
+        // 5. Auto-Load from Local Storage on Boot
+        function loadLocalDataOnStart() {
+            const localRaw = localStorage.getItem('bubbleCanvasLocalData');
+            if (localRaw) {
+                try {
+                    const data = JSON.parse(localRaw);
+                    let payload = data;
+                    
+                    if (data.encrypted) {
+                        let decrypted = null;
+                        let attempts = 0;
+
+                        while (decrypted === null && attempts < 3) {
+                            let password = prompt(
+                                attempts === 0 
+                                ? "Local storage is password protected. Enter password to load your previous canvas:" 
+                                : "Incorrect password. Try again:"
+                            );
+                            if (password === null) {
+                                console.log("User cancelled local storage load.");
+                                return; // Load default root bubble instead
+                            }
+                            try {
+                                decrypted = decryptJSON(data, password);
+                            } catch (err) {
+                                decrypted = null;
+                            }
+                            attempts++;
+                        }
+                        if (decrypted === null) {
+                            alert("Too many incorrect attempts. Loading blank default canvas instead.");
+                            return;
+                        }
+                        payload = decrypted;
+                    }
+
+                    if (payload.rootBubble && payload.rootBubble.children !== undefined) {
+                        rootBubble = payload.rootBubble;
+                        if (payload.camera) camera = payload.camera;
+                        needsRedraw = true;
+                        hasUnsavedChanges = false; // Just loaded, so technically no new changes yet
+                    }
+                } catch (err) {
+                    console.error("Failed to parse local data, starting fresh.", err);
+                }
+            }
+        }
+        
+        // Execute the auto-load sequence during initialization
+        loadLocalDataOnStart();
 
     </script>
 </body>
