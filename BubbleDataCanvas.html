@@ -306,11 +306,22 @@
             } else {
                 ctx.beginPath();
                 ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(26, 26, 36, ${alphaMultiplier * 0.75})`;
+                // Create a radial gradient for a spherical 3D look
+			let gradient = ctx.createRadialGradient(
+				screenX - screenR * 0.3, screenY - screenR * 0.3, screenR * 0.1, // Highlight source
+				screenX, screenY, screenR // Edge
+			);
+				gradient.addColorStop(0, `rgba(36, 42, 50, ${alphaMultiplier * 0.85})`);
+				gradient.addColorStop(1, `rgba(24, 28, 34, ${alphaMultiplier * 0.85})`);
+
+				ctx.beginPath();
+				ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
+				ctx.fillStyle = gradient;
+				ctx.fill();
+				ctx.strokeStyle = `rgba(150, 150, 150, ${alphaMultiplier})`;
+				ctx.lineWidth = Math.max(1, Math.min(screenR * 0.01, 4));
+				ctx.stroke();
                 ctx.fill();
-                ctx.strokeStyle = `rgba(102, 252, 241, ${alphaMultiplier})`;
-                ctx.lineWidth = Math.max(1, Math.min(screenR * 0.01, 4));
-                ctx.stroke();
             }
 
             if (screenR > 25 && alphaMultiplier > 0.15) {
@@ -334,38 +345,48 @@
             }
         }
 
-        function drawGizmo(sx, sy, alpha) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(sx, sy, GIZMO_RADIUS, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(31, 40, 51, ${alpha * 0.9})`;
-            ctx.fill();
-            ctx.strokeStyle = `rgba(102, 252, 241, ${alpha * 0.8})`;
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
+			   function drawGizmo(sx, sy, alpha) {
+			ctx.save();
+			ctx.beginPath();
+			ctx.arc(sx, sy, GIZMO_RADIUS, 0, Math.PI * 2);
+			ctx.fillStyle = `rgba(31, 40, 51, ${alpha * 0.9})`;
+			ctx.fill();
+			ctx.strokeStyle = `rgba(80, 80, 80, ${alpha * 0.8})`;
+			ctx.lineWidth = 1.5;
+			ctx.stroke();
 
-            ctx.beginPath();
-            ctx.moveTo(sx - GIZMO_RADIUS + 4, sy); ctx.lineTo(sx + GIZMO_RADIUS - 4, sy);
-            ctx.moveTo(sx, sy - GIZMO_RADIUS + 4); ctx.lineTo(sx, sy + GIZMO_RADIUS - 4);
-            ctx.strokeStyle = `rgba(102, 252, 241, ${alpha})`;
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
+			ctx.beginPath();
+			ctx.moveTo(sx - GIZMO_RADIUS + 4, sy);
+			ctx.lineTo(sx + GIZMO_RADIUS - 4, sy);
+			ctx.moveTo(sx, sy - GIZMO_RADIUS + 4);
+			ctx.lineTo(sx, sy + GIZMO_RADIUS - 4);
+			ctx.strokeStyle = `rgba(80, 80, 80, ${alpha})`;
+			ctx.lineWidth = 1.5;
+			ctx.stroke();
 
-            ctx.beginPath();
-            ctx.moveTo(sx - GIZMO_RADIUS + 4, sy); ctx.lineTo(sx - GIZMO_RADIUS + 7, sy - 3);
-            ctx.moveTo(sx - GIZMO_RADIUS + 4, sy); ctx.lineTo(sx - GIZMO_RADIUS + 7, sy + 3);
-            ctx.moveTo(sx + GIZMO_RADIUS - 4, sy); ctx.lineTo(sx + GIZMO_RADIUS - 7, sy - 3);
-            ctx.moveTo(sx + GIZMO_RADIUS - 4, sy); ctx.lineTo(sx + GIZMO_RADIUS - 7, sy + 3);
-            ctx.moveTo(sx, sy - GIZMO_RADIUS + 4); ctx.lineTo(sx - 3, sy - GIZMO_RADIUS + 7);
-            ctx.moveTo(sx, sy - GIZMO_RADIUS + 4); ctx.lineTo(sx + 3, sy - GIZMO_RADIUS + 7);
-            ctx.moveTo(sx, sy + GIZMO_RADIUS - 4); ctx.lineTo(sx - 3, sy + GIZMO_RADIUS - 7);
-            ctx.moveTo(sx, sy + GIZMO_RADIUS - 4); ctx.lineTo(sx + 3, sy + GIZMO_RADIUS - 7);
-            
-            ctx.strokeStyle = `rgba(102, 252, 241, ${alpha})`;
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-            ctx.restore();
-        }
+			ctx.beginPath();
+			ctx.moveTo(sx - GIZMO_RADIUS + 4, sy);
+			ctx.lineTo(sx - GIZMO_RADIUS + 7, sy - 3);
+			ctx.moveTo(sx - GIZMO_RADIUS + 4, sy);
+			ctx.lineTo(sx - GIZMO_RADIUS + 7, sy + 3);
+			ctx.moveTo(sx + GIZMO_RADIUS - 4, sy);
+			ctx.lineTo(sx + GIZMO_RADIUS - 7, sy - 3);
+			ctx.moveTo(sx + GIZMO_RADIUS - 4, sy);
+			ctx.lineTo(sx + GIZMO_RADIUS - 7, sy + 3);
+			ctx.moveTo(sx, sy - GIZMO_RADIUS + 4);
+			ctx.lineTo(sx - 3, sy - GIZMO_RADIUS + 7);
+			ctx.moveTo(sx, sy - GIZMO_RADIUS + 4);
+			ctx.lineTo(sx + 3, sy - GIZMO_RADIUS + 7);
+			ctx.moveTo(sx, sy + GIZMO_RADIUS - 4);
+			ctx.lineTo(sx - 3, sy + GIZMO_RADIUS - 7);
+			ctx.moveTo(sx, sy + GIZMO_RADIUS - 4);
+			ctx.lineTo(sx + 3, sy + GIZMO_RADIUS - 7);
+
+			ctx.strokeStyle = `rgba(80, 80, 80, ${alpha})`;
+			ctx.lineWidth = 1.2;
+			ctx.stroke();
+			ctx.restore();
+		}
 
         function loop() {
             if (needsRedraw) {
@@ -492,6 +513,12 @@
             lastMouseX = e.clientX;
             lastMouseY = e.clientY;
 
+            // 1. Prioritize Middle Mouse Button (MMB) panning
+            if (e.button === 1) {
+                interactionMode = 'pan';
+                return;
+            }
+
             let allBubbles = [];
             function collect(b) { allBubbles.push(b); b.children.forEach(collect); }
             collect(rootBubble);
@@ -503,7 +530,8 @@
                 let screenY = (b.y - camera.y) * camera.zoom + viewH / 2;
                 let screenDistToCenter = Math.hypot(e.clientX - screenX, e.clientY - screenY);
                 
-                if (screenDistToCenter <= GIZMO_RADIUS) {
+                // 2. Ensure bubble moving only happens with the Left Mouse Button (LMB)
+                if (e.button === 0 && screenDistToCenter <= GIZMO_RADIUS) {
                     activeBubble = b;
                     interactionMode = 'move';
                     dragOffsetWorldX = wCoords.x - b.x;
@@ -512,11 +540,7 @@
                 }
             }
 
-            if (e.button === 1) {
-                interactionMode = 'pan';
-                return;
-            }
-
+            // 3. Handle Left Mouse Button (LMB) resizing
             if (e.button === 0) {
                 let borderTarget = findBorderTarget(rootBubble, e.clientX, e.clientY);
                 if (borderTarget) {
