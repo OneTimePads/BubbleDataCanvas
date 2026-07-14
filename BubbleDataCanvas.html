@@ -50,6 +50,38 @@
             color: #0b0c10;
             box-shadow: 0 0 10px rgba(255, 76, 76, 0.5);
         }
+        /* Styling for the new password field UI */
+        .password-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        #cryptoPassword {
+            padding: 8px 12px;
+            background: #1f2833;
+            border: 1px solid #45a29e;
+            color: #66fcf1;
+            border-radius: 4px 0 0 4px;
+            outline: none;
+            width: 140px;
+            font-family: inherit;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+        }
+        #cryptoPassword::placeholder {
+            color: #45a29e;
+            opacity: 0.6;
+        }
+        #cryptoPassword:focus {
+            box-shadow: 0 0 10px rgba(102, 252, 241, 0.5);
+        }
+        #togglePasswordBtn {
+            margin-bottom: 0;
+            margin-right: 8px;
+            border-radius: 0 4px 4px 0;
+            border-left: none;
+            padding: 8px 12px;
+        }
         #instructions {
             margin-top: 4px;
             background: rgba(31, 40, 51, 0.4);
@@ -70,29 +102,33 @@
 </head>
 <body>
 
-		<div id="ui">
-			<div class="buttonRow">
-			<button id="exportBtn">Export Data</button>
-			<button id="importBtn">Import Data</button>
-			<button id="eraseLocalBtn">Erase Local</button>
-		</div>
+    <div id="ui">
+        <div class="buttonRow">
+            <button id="exportBtn">Export Data</button>
+            <button id="importBtn">Import Data</button>
+            <button id="eraseLocalBtn">Erase Local</button>
+        </div>
 
-		<div class="buttonRow">
-			<button id="saveLocalBtn">💾 Save Local</button>
-		</div>
+        <div class="buttonRow">
+            <button id="saveLocalBtn">💾 Save Local</button>
+        </div>
 
-		<input type="file" id="fileInput" style="display: none;" accept=".json">
+        <div class="password-container">
+            <input type="password" id="cryptoPassword" placeholder="Encryption Password">
+            <button id="togglePasswordBtn" title="Toggle Password Visibility">Show</button>
+        </div>
+
+        <input type="file" id="fileInput" style="display: none;" accept=".json">
         
         <div id="instructions">
             <b>Scroll</b>: Fast Zoom In/Out<br>
             <b>Drag Empty Space / Bubble Body</b>: Pan Canvas<br>
             <b>Drag Center ⊕ Gizmo</b>: Move Bubble (Drag outside or deep into another to reparent)<br>
-            <b>Drag Bubble Outer Border</b>: Resize / Extend Bubble<br>
-            <b>Double-Click</b>: Add Nested Bubble (sized to current zoom)<br>
-            <b>Shift + Double-Click</b>: Add a Smaller Nested Bubble<br>
-            <b>Right-Click</b>: Edit Bubble Text (clear it to delete)<br>
-            <b>Export/Import</b>: Optional password encrypts the file via custom XOR-CBC<br>
-            <b>Save Local</b>: Stores data in browser (also supports password encryption)
+            <b>Drag Outer Border</b>: Resize / Extend Bubble<br>
+            <b>Double-Click</b>: Add Nested Bubble<br>
+            <b>Shift + Double-Click</b>: Add Smaller Nested Bubble<br>
+            <b>Right-Click</b>: Edit Text (clear it to delete)<br>
+            <b>Password Field</b>: Used automatically for exporting/saving if filled.
         </div>
     </div>
 
@@ -101,6 +137,19 @@
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const cryptoPasswordInput = document.getElementById('cryptoPassword');
+        const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+
+        // Toggle Password Visibility
+        togglePasswordBtn.addEventListener('click', () => {
+            if (cryptoPasswordInput.type === 'password') {
+                cryptoPasswordInput.type = 'text';
+                togglePasswordBtn.textContent = 'Hide';
+            } else {
+                cryptoPasswordInput.type = 'password';
+                togglePasswordBtn.textContent = 'Show';
+            }
+        });
 
         const GIZMO_RADIUS = 14;
 
@@ -122,7 +171,7 @@
         const MAX_ZOOM = 5000000000000000; 
         
         let needsRedraw = true;
-        let hasUnsavedChanges = false; // Tracks if the user has made changes since last save
+        let hasUnsavedChanges = false; 
 
         let viewW = window.innerWidth;
         let viewH = window.innerHeight;
@@ -132,13 +181,10 @@
             hasUnsavedChanges = true;
         }
 
-        // -----------------------------------------------------------
-        // Browser Window Close Warning
-        // -----------------------------------------------------------
         window.addEventListener('beforeunload', (e) => {
             if (hasUnsavedChanges) {
                 e.preventDefault();
-                e.returnValue = ''; // Standard implementation for the browser's native warning prompt
+                e.returnValue = ''; 
             }
         });
 
@@ -163,10 +209,7 @@
             };
         }
 
-        // -----------------------------------------------------------
         // Rendering Engine
-        // -----------------------------------------------------------
-        
         function draw() {
             ctx.clearRect(0, 0, viewW, viewH);
             
@@ -333,10 +376,7 @@
         }
         loop();
 
-        // -----------------------------------------------------------
         // Structural Tree Lookups & Modification
-        // -----------------------------------------------------------
-
         function findDeepestBubble(b, wx, wy) {
             if (b.r * camera.zoom < 3) return null; 
 
@@ -428,10 +468,7 @@
             }
         }
 
-        // -----------------------------------------------------------
         // Interaction System
-        // -----------------------------------------------------------
-
         let interactionMode = 'none'; 
         let activeBubble = null;
         let lastMouseX = 0;
@@ -772,10 +809,7 @@
             }
         });
 
-        // -----------------------------------------------------------
         // Custom Sequential XOR-CBC Encryption
-        // -----------------------------------------------------------
-
         function bufToBase64(buf) {
             let binary = '';
             const bytes = new Uint8Array(buf);
@@ -843,19 +877,14 @@
             return JSON.parse(plaintext);
         }
 
-        // -----------------------------------------------------------
-        // State Persistence Systems (Export/Import & Local Storage)
-        // -----------------------------------------------------------
-
+        // State Persistence Systems
         // 1. Export Data to File
         document.getElementById('exportBtn').addEventListener('click', () => {
             const dataObj = { rootBubble, camera };
             let outputObj = dataObj;
             let filename = "patched_bubble_canvas.json";
 
-            let password = prompt(
-                "Optional: enter a password to encrypt the exported file.\nLeave blank to save without encryption."
-            );
+            let password = cryptoPasswordInput.value;
 
             if (password) {
                 try {
@@ -879,7 +908,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            hasUnsavedChanges = false; // Reset the warning since data is safely exported
+            hasUnsavedChanges = false; 
         });
 
         // 2. Import Data from File
@@ -902,16 +931,30 @@
                         let attempts = 0;
                         const MAX_ATTEMPTS = 3;
 
+                        // Try the current field password first silently
+                        let currentInputPass = cryptoPasswordInput.value;
+                        if (currentInputPass) {
+                            try {
+                                decrypted = decryptJSON(data, currentInputPass);
+                            } catch (err) {
+                                decrypted = null;
+                            }
+                        }
+
+                        // If field password fails or is empty, prompt the user
                         while (decrypted === null && attempts < MAX_ATTEMPTS) {
-                            let password = prompt(
+                            let promptPass = prompt(
                                 attempts === 0
                                     ? "This file is password protected. Enter password:"
                                     : "Incorrect password. Try again:"
                             );
-                            if (password === null) return; 
+                            if (promptPass === null) return; 
 
                             try {
-                                decrypted = decryptJSON(data, password);
+                                decrypted = decryptJSON(data, promptPass);
+                                if (decrypted !== null) {
+                                    cryptoPasswordInput.value = promptPass; // Store for future exports/saves
+                                }
                             } catch (err) {
                                 decrypted = null;
                             }
@@ -928,7 +971,7 @@
                     if (payload.rootBubble && payload.rootBubble.children !== undefined) {
                         rootBubble = payload.rootBubble;
                         if (payload.camera) camera = payload.camera;
-                        markChanged(); // Mark as unsaved so the user remembers to save locally/export later
+                        markChanged();
                     } else {
                         alert("Malformed template dataset structure.");
                     }
@@ -946,9 +989,7 @@
             const dataObj = { rootBubble, camera };
             let outputObj = dataObj;
 
-            let password = prompt(
-                "Optional: enter a password to encrypt local storage.\nLeave blank to save without encryption."
-            );
+            let password = cryptoPasswordInput.value;
 
             if (password) {
                 try {
@@ -961,7 +1002,7 @@
 
             try {
                 localStorage.setItem('bubbleCanvasLocalData', JSON.stringify(outputObj));
-                hasUnsavedChanges = false; // Reset warning since data is safely secured locally
+                hasUnsavedChanges = false;
                 alert("Canvas successfully saved to local browser storage.");
             } catch (err) {
                 alert("Failed to save locally. Your storage might be full or blocked.");
@@ -989,17 +1030,20 @@
                         let attempts = 0;
 
                         while (decrypted === null && attempts < 3) {
-                            let password = prompt(
+                            let promptPass = prompt(
                                 attempts === 0 
                                 ? "Local storage is password protected. Enter password to load your previous canvas:" 
                                 : "Incorrect password. Try again:"
                             );
-                            if (password === null) {
+                            if (promptPass === null) {
                                 console.log("User cancelled local storage load.");
-                                return; // Load default root bubble instead
+                                return;
                             }
                             try {
-                                decrypted = decryptJSON(data, password);
+                                decrypted = decryptJSON(data, promptPass);
+                                if (decrypted !== null) {
+                                    cryptoPasswordInput.value = promptPass; // Keep it typed in so user can re-save seamlessly
+                                }
                             } catch (err) {
                                 decrypted = null;
                             }
@@ -1016,7 +1060,7 @@
                         rootBubble = payload.rootBubble;
                         if (payload.camera) camera = payload.camera;
                         needsRedraw = true;
-                        hasUnsavedChanges = false; // Just loaded, so technically no new changes yet
+                        hasUnsavedChanges = false; 
                     }
                 } catch (err) {
                     console.error("Failed to parse local data, starting fresh.", err);
@@ -1024,7 +1068,6 @@
             }
         }
         
-        // Execute the auto-load sequence during initialization
         loadLocalDataOnStart();
 
     </script>
