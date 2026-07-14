@@ -300,19 +300,35 @@
 
             let maxCornerDistSq = Math.max(distTopLeftSq, distTopRightSq, distBottomLeftSq, distBottomRightSq);
 
-            if (maxCornerDistSq < sqR) {
-                ctx.fillStyle = `rgba(26, 26, 36, ${alphaMultiplier * 0.75})`;
-                ctx.fillRect(0, 0, viewW, viewH);
-            } else {
-                ctx.beginPath();
-                ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
-                // Create a radial gradient for a spherical 3D look
+			if (maxCornerDistSq < sqR) {
+				// Matches the 0.00 stop (center) of the radial gradient below
+				ctx.fillStyle = `rgba(10, 10, 12, ${alphaMultiplier * 0.85})`;
+				ctx.fillRect(0, 0, viewW, viewH);
+			} else {
+							ctx.beginPath();
+							ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
+							// Create a radial gradient for a spherical 3D look
 			let gradient = ctx.createRadialGradient(
-				screenX - screenR * 0.3, screenY - screenR * 0.3, screenR * 0.1, // Highlight source
-				screenX, screenY, screenR // Edge
+				screenX - screenR * 0.15,
+				screenY - screenR * 0.15,
+				screenR * 0.05,
+				screenX,
+				screenY,
+				screenR
 			);
-				gradient.addColorStop(0, `rgba(36, 42, 50, ${alphaMultiplier * 0.85})`);
-				gradient.addColorStop(1, `rgba(24, 28, 34, ${alphaMultiplier * 0.85})`);
+
+			// Center - almost black
+			gradient.addColorStop(0.00, `rgba(10, 10, 12, ${alphaMultiplier * 0.85})`);
+			gradient.addColorStop(0.20, `rgba(14, 14, 16, ${alphaMultiplier * 0.85})`);
+
+			// Stay dark through most of the bubble
+			gradient.addColorStop(0.75, `rgba(18, 20, 24, ${alphaMultiplier * 0.85})`);
+
+			// Bright outer ring
+			gradient.addColorStop(0.92, `rgba(42, 46, 54, ${alphaMultiplier * 0.85})`);
+
+			// Slightly darker at the very edge
+			gradient.addColorStop(1.00, `rgba(32, 36, 42, ${alphaMultiplier * 0.85})`);
 
 				ctx.beginPath();
 				ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
