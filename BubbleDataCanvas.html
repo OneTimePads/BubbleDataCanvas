@@ -318,17 +318,17 @@
 			);
 
 			// Center - almost black
-			gradient.addColorStop(0.00, `rgba(10, 10, 12, ${alphaMultiplier * 0.85})`);
-			gradient.addColorStop(0.20, `rgba(14, 14, 16, ${alphaMultiplier * 0.85})`);
+			gradient.addColorStop(0.00, `rgba(10, 10, 12, ${alphaMultiplier * 0.55})`);
+			gradient.addColorStop(0.20, `rgba(14, 14, 16, ${alphaMultiplier * 0.55})`);
 
 			// Stay dark through most of the bubble
-			gradient.addColorStop(0.75, `rgba(18, 20, 24, ${alphaMultiplier * 0.85})`);
+			gradient.addColorStop(0.75, `rgba(18, 20, 24, ${alphaMultiplier * 0.55})`);
 
 			// Bright outer ring
-			gradient.addColorStop(0.92, `rgba(42, 46, 54, ${alphaMultiplier * 0.85})`);
+			gradient.addColorStop(0.92, `rgba(42, 46, 54, ${alphaMultiplier * 0.55})`);
 
 			// Slightly darker at the very edge
-			gradient.addColorStop(1.00, `rgba(32, 36, 42, ${alphaMultiplier * 0.85})`);
+			gradient.addColorStop(1.00, `rgba(32, 36, 42, ${alphaMultiplier * 0.55})`);
 
 				ctx.beginPath();
 				ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
