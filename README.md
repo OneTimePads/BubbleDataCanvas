@@ -4,8 +4,7 @@ Single HTML file with a zoomable data canvas containing bubbles.
 Features:
 
 * Move, resize, rename, re-parent, and delete bubbles.
-* Supports an extremely deep hierarchy, with a maximum depth approaching `Number.MAX_SAFE_INTEGER`. At such extreme depths, JavaScript floating-point precision limitations may cause non-deterministic behavior.
+* Supports an extremely deep hierarchy, with a maximum depth approaching `Number.MAX_SAFE_INTEGER`. At such extreme depths, JavaScript floating-point precision limitations may cause non-deterministic-like behavior. Fun to watch and 100% safe.
 * Save and load data locally or from files.
 
 Data files are encrypted with a password using a simple XOR-CBC encryption algorithm.
-
