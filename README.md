@@ -1,6 +1,11 @@
-<img width="806" height="581" alt="Screen" src="https://github.com/user-attachments/assets/1f770fcc-98b4-4222-9eb8-6b05fa94276d" />
-Single html file with zoomable data canvas containing bubbles.
-Bubbles can be moved, resized, renamed, re-parented, deleted, etc.
-Max depth is close to Number.MAX_SAFE_INTEGER. At this zoom level thigns are starting to behave undeterministic-like.
-Data can be saved and loaded.
-Files are encrypted with password and simple XOR-CBC algorithm.
+<img width="1104" height="586" alt="screen2" src="https://github.com/user-attachments/assets/e50ad23c-c3f2-4cd9-aaed-39b20123cc17" />
+Single HTML file with a zoomable data canvas containing bubbles.
+
+Features:
+
+* Move, resize, rename, re-parent, and delete bubbles.
+* Supports an extremely deep hierarchy, with a maximum depth approaching `Number.MAX_SAFE_INTEGER`. At such extreme depths, JavaScript floating-point precision limitations may cause non-deterministic behavior.
+* Save and load data locally or from files.
+
+Data files are encrypted with a password using a simple XOR-CBC encryption algorithm.
+
