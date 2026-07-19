@@ -319,14 +319,10 @@
             let maxCornerDistSq = Math.max(distTopLeftSq, distTopRightSq, distBottomLeftSq, distBottomRightSq);
 
 			if (maxCornerDistSq < sqR) {
-				// Matches the 0.00 stop (center) of the radial gradient below
+				// Matches the standard background base fill color
 				ctx.fillStyle = `rgba(10, 10, 12, ${alphaMultiplier * 0.85})`;
 				ctx.fillRect(0, 0, viewW, viewH);
 			} else if (screenR < GRADIENT_LOD_SCREEN_RADIUS) {
-				// LOD: a multi-stop radial gradient is imperceptible on a bubble this
-				// small, but it's the single most expensive thing we do per bubble.
-				// Small bubbles are typically also the most numerous ones on screen
-				// in a deep hierarchy, so a flat fill here is the biggest win available.
 				ctx.beginPath();
 				ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
 				ctx.fillStyle = `rgba(20, 21, 24, ${alphaMultiplier * 0.55})`;
@@ -335,32 +331,10 @@
 				ctx.lineWidth = Math.max(1, Math.min(screenR * 0.01, 4));
 				ctx.stroke();
 			} else {
-				// Create a radial gradient for a spherical 3D look
-			let gradient = ctx.createRadialGradient(
-				screenX - screenR * 0.15,
-				screenY - screenR * 0.15,
-				screenR * 0.05,
-				screenX,
-				screenY,
-				screenR
-			);
-
-			// Center - almost black
-			gradient.addColorStop(0.00, `rgba(10, 10, 12, ${alphaMultiplier * 0.55})`);
-			gradient.addColorStop(0.20, `rgba(14, 14, 16, ${alphaMultiplier * 0.55})`);
-
-			// Stay dark through most of the bubble
-			gradient.addColorStop(0.75, `rgba(18, 20, 24, ${alphaMultiplier * 0.55})`);
-
-			// Bright outer ring
-			gradient.addColorStop(0.92, `rgba(42, 46, 54, ${alphaMultiplier * 0.55})`);
-
-			// Slightly darker at the very edge
-			gradient.addColorStop(1.00, `rgba(32, 36, 42, ${alphaMultiplier * 0.55})`);
-
+				// Replaced the multi-stop radial gradient with a uniform solid fill
 				ctx.beginPath();
 				ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
-				ctx.fillStyle = gradient;
+				ctx.fillStyle = `rgba(18, 20, 24, ${alphaMultiplier * 0.55})`;
 				ctx.fill();
 				ctx.strokeStyle = `rgba(150, 150, 150, ${alphaMultiplier})`;
 				ctx.lineWidth = Math.max(1, Math.min(screenR * 0.01, 4));
@@ -388,7 +362,7 @@
             }
         }
 
-			   function drawGizmo(sx, sy, alpha) {
+	   function drawGizmo(sx, sy, alpha) {
 			ctx.save();
 			ctx.beginPath();
 			ctx.arc(sx, sy, GIZMO_RADIUS, 0, Math.PI * 2);
@@ -460,6 +434,7 @@
             return null;
         }
 
+        // Interaction System
         function findBorderTarget(root, clientX, clientY) {
             let best = null;
             let bestDelta = Infinity;
@@ -536,7 +511,6 @@
             }
         }
 
-        // Interaction System
         let interactionMode = 'none'; 
         let activeBubble = null;
         let lastMouseX = 0;
@@ -601,10 +575,6 @@
         });
 
         window.addEventListener('mousemove', e => {
-            // Keep this listener as cheap as possible: native mousemove events can fire
-            // far more often than the display refreshes (high-poll-rate mice/trackpads
-            // routinely exceed 1000Hz). We just stash the latest pointer state here;
-            // the actual work happens at most once per animation frame in loop().
             pendingPointerX = e.clientX;
             pendingPointerY = e.clientY;
             pendingPointerButtons = e.buttons;
