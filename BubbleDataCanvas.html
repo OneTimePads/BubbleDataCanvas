@@ -136,7 +136,11 @@
 
     <script>
         const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
+        // alpha:false tells the browser this canvas never needs to be alpha-blended with
+        // whatever is behind it, which lets it skip a compositing step on every frame -
+        // a meaningful win on low-power/mobile GPUs. desynchronized:true is a latency hint
+        // supported by most modern browsers (falls back harmlessly where unsupported).
+        const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         const cryptoPasswordInput = document.getElementById('cryptoPassword');
         const togglePasswordBtn = document.getElementById('togglePasswordBtn');
 
@@ -156,6 +160,7 @@
         const DEFAULT_BUBBLE_SCREEN_RADIUS = 60;
         const SMALL_BUBBLE_SCREEN_RADIUS = 24;
         const MIN_SCREEN_RADIUS = 8;
+        const GRADIENT_LOD_SCREEN_RADIUS = 20; // below this, skip the gradient (see drawBubble)
 
         let rootBubble = {
             id: crypto.randomUUID(),
@@ -176,6 +181,15 @@
         let viewW = window.innerWidth;
         let viewH = window.innerHeight;
 
+        // Latest raw pointer position, updated cheaply on every native mousemove event.
+        // The actual drag/resize physics and hit-testing (processPointerMove, defined
+        // later) only run once per animation frame, decoupling expensive computation
+        // from the raw input event rate - see loop() below.
+        let pendingPointerX = 0;
+        let pendingPointerY = 0;
+        let pendingPointerButtons = 0;
+        let pointerMoveQueued = false;
+
         function markChanged() {
             needsRedraw = true;
             hasUnsavedChanges = true;
@@ -188,8 +202,9 @@
             }
         });
 
+        const MAX_DPR = 2; // cap render resolution multiplier for perf on high-DPI low-end devices
         function resize() {
-            const dpr = window.devicePixelRatio || 1;
+            const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
             viewW = window.innerWidth;
             viewH = window.innerHeight;
             canvas.width = Math.round(viewW * dpr);
@@ -211,8 +226,11 @@
 
         // Rendering Engine
         function draw() {
-            ctx.clearRect(0, 0, viewW, viewH);
-            
+            // Opaque context: paint the background explicitly instead of clearRect
+            // (clearRect would reset to black rather than transparent on alpha:false contexts).
+            ctx.fillStyle = '#0b0c10';
+            ctx.fillRect(0, 0, viewW, viewH);
+
             ctx.fillStyle = '#1f2833';
             let cx = (-camera.x) * camera.zoom + viewW / 2;
             let cy = (-camera.y) * camera.zoom + viewH / 2;
@@ -222,14 +240,14 @@
         }
 
         const textCache = new Map();
+        // Reused offscreen canvas for text measurement (avoids creating a new
+        // canvas element + context for every never-before-seen label).
+        const measureCanvas = document.createElement('canvas');
+        const ctxTemp = measureCanvas.getContext('2d');
+        ctxTemp.font = `bold 22px sans-serif`;
 
         function getWrappedTextLines(text) {
             if (textCache.has(text)) return textCache.get(text);
-
-            let tempCanvas = document.createElement('canvas');
-            let ctxTemp = tempCanvas.getContext('2d');
-            let baseFontSize = 22; 
-            ctxTemp.font = `bold ${baseFontSize}px sans-serif`;
 
             let words = text.split(' ');
             let lines = [];
@@ -304,10 +322,20 @@
 				// Matches the 0.00 stop (center) of the radial gradient below
 				ctx.fillStyle = `rgba(10, 10, 12, ${alphaMultiplier * 0.85})`;
 				ctx.fillRect(0, 0, viewW, viewH);
+			} else if (screenR < GRADIENT_LOD_SCREEN_RADIUS) {
+				// LOD: a multi-stop radial gradient is imperceptible on a bubble this
+				// small, but it's the single most expensive thing we do per bubble.
+				// Small bubbles are typically also the most numerous ones on screen
+				// in a deep hierarchy, so a flat fill here is the biggest win available.
+				ctx.beginPath();
+				ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
+				ctx.fillStyle = `rgba(20, 21, 24, ${alphaMultiplier * 0.55})`;
+				ctx.fill();
+				ctx.strokeStyle = `rgba(150, 150, 150, ${alphaMultiplier})`;
+				ctx.lineWidth = Math.max(1, Math.min(screenR * 0.01, 4));
+				ctx.stroke();
 			} else {
-							ctx.beginPath();
-							ctx.arc(screenX, screenY, screenR, 0, Math.PI * 2);
-							// Create a radial gradient for a spherical 3D look
+				// Create a radial gradient for a spherical 3D look
 			let gradient = ctx.createRadialGradient(
 				screenX - screenR * 0.15,
 				screenY - screenR * 0.15,
@@ -337,7 +365,6 @@
 				ctx.strokeStyle = `rgba(150, 150, 150, ${alphaMultiplier})`;
 				ctx.lineWidth = Math.max(1, Math.min(screenR * 0.01, 4));
 				ctx.stroke();
-                ctx.fill();
             }
 
             if (screenR > 25 && alphaMultiplier > 0.15) {
@@ -405,6 +432,10 @@
 		}
 
         function loop() {
+            if (pointerMoveQueued) {
+                processPointerMove(pendingPointerX, pendingPointerY, pendingPointerButtons);
+                pointerMoveQueued = false;
+            }
             if (needsRedraw) {
                 draw();
                 needsRedraw = false;
@@ -570,17 +601,28 @@
         });
 
         window.addEventListener('mousemove', e => {
+            // Keep this listener as cheap as possible: native mousemove events can fire
+            // far more often than the display refreshes (high-poll-rate mice/trackpads
+            // routinely exceed 1000Hz). We just stash the latest pointer state here;
+            // the actual work happens at most once per animation frame in loop().
+            pendingPointerX = e.clientX;
+            pendingPointerY = e.clientY;
+            pendingPointerButtons = e.buttons;
+            pointerMoveQueued = true;
+        }, { passive: true });
+
+        function processPointerMove(clientX, clientY, buttons) {
             if (interactionMode !== 'none') {
             
             if (interactionMode === 'pan') {
-                    if (e.buttons & 4) { 
+                    if (buttons & 4) { 
                         canvas.style.cursor = 'grabbing';
-                        let dx = e.clientX - lastMouseX;
-                        let dy = e.clientY - lastMouseY;
+                        let dx = clientX - lastMouseX;
+                        let dy = clientY - lastMouseY;
                         camera.x -= dx / camera.zoom;
                         camera.y -= dy / camera.zoom;
-                        lastMouseX = e.clientX;
-                        lastMouseY = e.clientY;
+                        lastMouseX = clientX;
+                        lastMouseY = clientY;
                         markChanged();
                     } else {
                         cancelInteraction();
@@ -588,7 +630,7 @@
                 } 
                 
                 else if (interactionMode === 'move' && activeBubble) {
-                    let wCoords = getRawWorldCoords(e.clientX, e.clientY);
+                    let wCoords = getRawWorldCoords(clientX, clientY);
                     canvas.style.cursor = 'move';
                     let targetX = wCoords.x - dragOffsetWorldX;
                     let targetY = wCoords.y - dragOffsetWorldY;
@@ -667,7 +709,7 @@
                 } 
                 
                 else if (interactionMode === 'resize' && activeBubble) {
-                    let wCoords = getRawWorldCoords(e.clientX, e.clientY);
+                    let wCoords = getRawWorldCoords(clientX, clientY);
                     canvas.style.cursor = 'ew-resize';
                     
                     let currentDistance = Math.hypot(wCoords.x - activeBubble.x, wCoords.y - activeBubble.y);
@@ -703,29 +745,29 @@
                 return; 
             }
 
-            if (Math.abs(e.clientX - lastMouseX) < 3 && Math.abs(e.clientY - lastMouseY) < 3) return;
-            lastMouseX = e.clientX;
-            lastMouseY = e.clientY;
+            if (Math.abs(clientX - lastMouseX) < 3 && Math.abs(clientY - lastMouseY) < 3) return;
+            lastMouseX = clientX;
+            lastMouseY = clientY;
 
-            let wCoords = getRawWorldCoords(e.clientX, e.clientY);
+            let wCoords = getRawWorldCoords(clientX, clientY);
             let deepTarget = findDeepestBubble(rootBubble, wCoords.x, wCoords.y);
             let overGizmo = false;
 
             if (deepTarget) {
                 let screenX = (deepTarget.x - camera.x) * camera.zoom + viewW / 2;
                 let screenY = (deepTarget.y - camera.y) * camera.zoom + viewH / 2;
-                let screenDistToCenter = Math.hypot(e.clientX - screenX, e.clientY - screenY);
+                let screenDistToCenter = Math.hypot(clientX - screenX, clientY - screenY);
                 if (screenDistToCenter <= GIZMO_RADIUS) overGizmo = true;
             }
 
             if (overGizmo) {
                 canvas.style.cursor = 'move';
-            } else if (findBorderTarget(rootBubble, e.clientX, e.clientY)) {
+            } else if (findBorderTarget(rootBubble, clientX, clientY)) {
                 canvas.style.cursor = 'ew-resize';
             } else {
                 canvas.style.cursor = 'grab';
             }
-        });
+        }
 
         window.addEventListener('mouseup', () => {
             interactionMode = 'none';
