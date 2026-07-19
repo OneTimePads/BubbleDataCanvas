@@ -423,12 +423,18 @@
         loop();
 
         // Structural Tree Lookups & Modification
-        function findDeepestBubble(b, wx, wy) {
-            if (b.r * camera.zoom < 3) return null; 
+        function findDeepestBubble(b, wx, wy, alphaMultiplier = 1.0) {
+            let screenR = b.r * camera.zoom;
+            if (screenR * alphaMultiplier < 0.5) return null; 
 
-            for (let i = b.children.length - 1; i >= 0; i--) {
-                let found = findDeepestBubble(b.children[i], wx, wy);
-                if (found) return found;
+            let childrenFade = Math.max(0, Math.min(1, (screenR - 100) / 150));
+            let nextAlphaMultiplier = alphaMultiplier * childrenFade;
+
+            if (nextAlphaMultiplier > 0.01) {
+                for (let i = b.children.length - 1; i >= 0; i--) {
+                    let found = findDeepestBubble(b.children[i], wx, wy, nextAlphaMultiplier);
+                    if (found) return found;
+                }
             }
             let dx = b.x - wx;
             let dy = b.y - wy;
@@ -443,10 +449,12 @@
             let best = null;
             let bestDelta = Infinity;
 
-            function recurse(b) {
+            function recurse(b, alphaMultiplier) {
                 let screenX = (b.x - camera.x) * camera.zoom + viewW / 2;
                 let screenY = (b.y - camera.y) * camera.zoom + viewH / 2;
                 let screenR = b.r * camera.zoom;
+
+                if (screenR * alphaMultiplier < 0.5) return;
 
                 if (screenR >= 3) {
                     let screenDistToCenter = Math.hypot(clientX - screenX, clientY - screenY);
@@ -459,12 +467,17 @@
                     }
                 }
 
-                for (let child of b.children) {
-                    recurse(child);
+                let childrenFade = Math.max(0, Math.min(1, (screenR - 100) / 150));
+                let nextAlphaMultiplier = alphaMultiplier * childrenFade;
+
+                if (nextAlphaMultiplier > 0.01) {
+                    for (let child of b.children) {
+                        recurse(child, nextAlphaMultiplier);
+                    }
                 }
             }
 
-            recurse(root);
+            recurse(root, 1.0);
             return best;
         }
 
@@ -545,8 +558,18 @@
             }
 
             let allBubbles = [];
-            function collect(b) { allBubbles.push(b); b.children.forEach(collect); }
-            collect(rootBubble);
+            function collect(b, alphaMultiplier) { 
+                let screenR = b.r * camera.zoom;
+                if (screenR > 25 && alphaMultiplier > 0.15) {
+                    allBubbles.push(b); 
+                }
+                let childrenFade = Math.max(0, Math.min(1, (screenR - 100) / 150));
+                let nextAlphaMultiplier = alphaMultiplier * childrenFade;
+                if (nextAlphaMultiplier > 0.01) {
+                    b.children.forEach(child => collect(child, nextAlphaMultiplier)); 
+                }
+            }
+            collect(rootBubble, 1.0);
             
             allBubbles.sort((a,b) => (a.r * camera.zoom) - (b.r * camera.zoom));
 
@@ -730,8 +753,9 @@
             if (deepTarget) {
                 let screenX = (deepTarget.x - camera.x) * camera.zoom + viewW / 2;
                 let screenY = (deepTarget.y - camera.y) * camera.zoom + viewH / 2;
+                let screenR = deepTarget.r * camera.zoom;
                 let screenDistToCenter = Math.hypot(clientX - screenX, clientY - screenY);
-                if (screenDistToCenter <= GIZMO_RADIUS) overGizmo = true;
+                if (screenDistToCenter <= GIZMO_RADIUS && screenR > 25) overGizmo = true;
             }
 
             if (overGizmo) {
