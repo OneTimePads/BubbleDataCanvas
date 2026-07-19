@@ -82,27 +82,28 @@
             border-left: none;
             padding: 8px 12px;
         }
-        #instructions {
-            margin-top: 4px;
-            background: rgba(31, 40, 51, 0.4);
-            padding: 8px;
-            border-radius: 6px;
-            font-size: 10px;
-            color: #c5c6c7;
-            box-shadow: none;
-            pointer-events: none;
-            border: none;
-            line-height: 1.4;
-            user-select: none;
-        }
-        #instructions b {
-            color: #66fcf1;
-        }
+		#instructions {
+			position: fixed;
+			bottom: 20px;
+			right: 20px;
+			z-index: 1; /* Keeps it above the canvas but below the main UI */
+			background: transparent;
+			font-size: 13px;
+			color: rgba(197, 198, 199, 0.4); /* Dimmed to act as a watermark */
+			text-align: right;
+			pointer-events: none; /* Allows clicks to pass directly through to the canvas */
+			user-select: none;
+			line-height: 1.6;
+		}
+
+		#instructions b {
+			color: rgba(102, 252, 241, 0.4); /* Dimmed accent color */
+		}
     </style>
 </head>
 <body>
 
-    <div id="ui">
+	<div id="ui">
         <div class="buttonRow">
             <button id="exportBtn">Export Data</button>
             <button id="importBtn">Import Data</button>
@@ -119,17 +120,18 @@
         </div>
 
         <input type="file" id="fileInput" style="display: none;" accept=".json">
-        
-        <div id="instructions">
-            <b>Scroll</b>: Fast Zoom In/Out<br>
-            <b>MMB (scroll button)</b>: Pan Canvas<br>
-            <b>Drag Center ⊕ Gizmo</b>: Move Bubble. Drag outside or deep into another to reparent<br>
-            <b>Drag Outer Border</b>: Resize / Extend Bubble<br>
-            <b>Double-Click</b>: Add Nested Bubble<br>
-            <b>Shift + Double-Click</b>: Add Smaller Nested Bubble<br>
-            <b>Right-Click</b>: Edit Text. Clear it to delete<br>
-            <b>Password Field</b>: Used automatically for exporting/saving if filled
-        </div>
+    </div>
+
+    <!-- Instructions moved outside the #ui div -->
+    <div id="instructions">
+        <b>Scroll</b>: Fast Zoom In/Out<br>
+        <b>MMB (scroll button)</b>: Pan Canvas<br>
+        <b>Drag Center ⊕ Gizmo</b>: Move Bubble. Drag outside or deep into another to reparent<br>
+        <b>Drag Outer Border</b>: Resize / Extend Bubble<br>
+        <b>Double-Click</b>: Add Nested Bubble<br>
+        <b>Shift + Double-Click</b>: Add Smaller Nested Bubble<br>
+        <b>Right-Click</b>: Edit Text. Clear it to delete<br>
+        <b>Password Field</b>: Used automatically for exporting/saving if filled
     </div>
 
     <canvas id="canvas"></canvas>
