@@ -303,7 +303,7 @@
             }
         }
 
-        function drawBubble(b, alphaMultiplier) {
+       function drawBubble(b, alphaMultiplier) {
             let screenX = (b.x - camera.x) * camera.zoom + viewW / 2;
             let screenY = (b.y - camera.y) * camera.zoom + viewH / 2;
             let screenR = b.r * camera.zoom;
@@ -335,7 +335,12 @@
 				ctx.fill();
 				ctx.strokeStyle = `rgba(150, 150, 150, ${alphaMultiplier})`;
 				ctx.lineWidth = borderLineWidth;
+				
+                // Apply a static small dash for empty low-LOD bubbles
+                if (childCount === 0) ctx.setLineDash([4, 4]); 
 				ctx.stroke();
+                if (childCount === 0) ctx.setLineDash([]); // Reset to solid immediately
+                
 			} else {
 				// Replaced the multi-stop radial gradient with a uniform solid fill
 				ctx.beginPath();
@@ -344,7 +349,14 @@
 				ctx.fill();
 				ctx.strokeStyle = `rgba(150, 150, 150, ${alphaMultiplier})`;
 				ctx.lineWidth = borderLineWidth;
+				
+                // Apply a dynamically scaled dash for empty large bubbles
+                if (childCount === 0) {
+                    let dashSize = Math.max(6, Math.min(screenR * 0.1, 20));
+                    ctx.setLineDash([dashSize, dashSize]);
+                }
 				ctx.stroke();
+                if (childCount === 0) ctx.setLineDash([]); // Reset to solid immediately
             }
 
             if (screenR > 25 && alphaMultiplier > 0.15) {
