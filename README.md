@@ -10,4 +10,4 @@ Features:
 Data files are encrypted with a password using a simple XOR-CBC encryption algorithm.
 
 Like rectangles more? Check this repository:
-https://github.com/OneTimePads/RectangleDataCanvas/tree/master
+https://github.com/OneTimePads/RectangleDataCanvas
